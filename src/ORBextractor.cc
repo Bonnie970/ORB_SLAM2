@@ -1135,12 +1135,39 @@ void ORBextractor::ComputePyramid(cv::Mat image)
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
+#include <pybind11/complex.h>
+#include <pybind11/functional.h> 
+#include <pybind11/chrono.h>
+#include <iostream>
+using namespace std;
 
 namespace py = pybind11;
-int static_inc() {
-    static ORB_SLAM2::ORBextractor ex(0, 0, 1, 0, 0);
-    ex.nlevels++;
-    return ex.GetLevels();
+// int orb_extractor_wrapper(cv::Mat img, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors) {
+//int orb_extractor_wrapper(unsigned char* imgData, int rows, int cols){//, py::array_t<double> keypoints, py::array_t<double> descriptor) {
+py::array_t<int> orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int cols, py::array_t<int> keypoints, py::array_t<uint8_t> descriptor) {
+    static ORB_SLAM2::ORBextractor extractor(2000, 1.2, 8, 20, 7);
+    std::vector<cv::KeyPoint> k;
+    //cv::OutputArray d;
+    cv::Mat d;
+    cv::Mat img_mat(rows, cols, CV_8UC3, img.request().ptr); 
+    extractor(img_mat, cv::Mat(), k, d); 
+   int n = 2000;
+   py::buffer_info buf_k = keypoints.request();
+   py::buffer_info buf_d = descriptor.request();
+   int *ptr_k = static_cast<int *>(buf_k.ptr);
+   unsigned char *ptr_d = static_cast<unsigned char *>(buf_d.ptr);
+   cout << " #buf_k size" << buf_k.size;
+   cout << " #buf_d size" << buf_d.size;
+   for(int i=0; i < n; i++){
+        ptr_k[i*2] = k[i].pt.x;
+	ptr_k[i*2+1] = k[i].pt.y;
+	for (int j=0; j < 32; j++){
+	    ptr_d[i*32 + j] = d.at<uchar>(i,j);
+	}
+    } 
+//    return descriptor;
+	return keypoints; //extractor.GetLevels();
 }
 
 int test_size(py::array_t<double> img) {
@@ -1148,6 +1175,6 @@ int test_size(py::array_t<double> img) {
 }
 
 PYBIND11_MODULE(ORB_SLAM2, m) {
-    m.def("static_inc", &static_inc, "A test function");
+    m.def("orb_extractor_wrapper", &orb_extractor_wrapper, "A test function");
     m.def("test_size", &test_size, "A test function");
 }
