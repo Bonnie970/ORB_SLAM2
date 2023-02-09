@@ -1145,7 +1145,8 @@ using namespace std;
 namespace py = pybind11;
 // int orb_extractor_wrapper(cv::Mat img, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors) {
 //int orb_extractor_wrapper(unsigned char* imgData, int rows, int cols){//, py::array_t<double> keypoints, py::array_t<double> descriptor) {
-py::array_t<int> orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int cols, py::array_t<int> keypoints, py::array_t<uint8_t> descriptor) {
+//py::array_t<int> 
+void orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int cols, py::array_t<float> &keypoints, py::array_t<uint8_t> &descriptor) {
     static ORB_SLAM2::ORBextractor extractor(2000, 1.2, 8, 20, 7);
     std::vector<cv::KeyPoint> k;
     //cv::OutputArray d;
@@ -1155,7 +1156,7 @@ py::array_t<int> orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int c
    int n = 2000;
    py::buffer_info buf_k = keypoints.request();
    py::buffer_info buf_d = descriptor.request();
-   int *ptr_k = static_cast<int *>(buf_k.ptr);
+   float *ptr_k = static_cast<float *>(buf_k.ptr);
    unsigned char *ptr_d = static_cast<unsigned char *>(buf_d.ptr);
    cout << " #buf_k size" << buf_k.size;
    cout << " #buf_d size" << buf_d.size;
@@ -1166,7 +1167,7 @@ py::array_t<int> orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int c
 	    ptr_d[i*256 + j] = d.at<uchar>(i,j);
 	}
     } 
-    return descriptor;
+    // return descriptor;
 //	return keypoints; //extractor.GetLevels();
 }
 
