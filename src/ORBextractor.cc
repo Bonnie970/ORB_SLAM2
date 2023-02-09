@@ -1162,12 +1162,12 @@ py::array_t<int> orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int c
    for(int i=0; i < n; i++){
         ptr_k[i*2] = k[i].pt.x;
 	ptr_k[i*2+1] = k[i].pt.y;
-	for (int j=0; j < 32; j++){
-	    ptr_d[i*32 + j] = d.at<uchar>(i,j);
+	for (int j=0; j < 256; j++){
+	    ptr_d[i*256 + j] = d.at<uchar>(i,j);
 	}
     } 
-//    return descriptor;
-	return keypoints; //extractor.GetLevels();
+    return descriptor;
+//	return keypoints; //extractor.GetLevels();
 }
 
 int test_size(py::array_t<double> img) {
