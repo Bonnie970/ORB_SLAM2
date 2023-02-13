@@ -1146,21 +1146,21 @@ namespace py = pybind11;
 // int orb_extractor_wrapper(cv::Mat img, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors) {
 //int orb_extractor_wrapper(unsigned char* imgData, int rows, int cols){//, py::array_t<double> keypoints, py::array_t<double> descriptor) {
 //py::array_t<int> 
-void orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int cols, py::array_t<float> &keypoints, py::array_t<uint8_t> &descriptor) {
+void orb_extractor_wrapper(py::array_t<uint8_t> &img, int rows, int cols, py::array_t<float> &keypoints, py::array_t<uint8_t> &descriptor) {
     static ORB_SLAM2::ORBextractor extractor(2000, 1.2, 8, 20, 7);
     std::vector<cv::KeyPoint> k;
     //cv::OutputArray d;
     cv::Mat d;
     cv::Mat img_mat(rows, cols, CV_8UC3, img.request().ptr); 
     extractor(img_mat, cv::Mat(), k, d); 
-   int n = 2000;
+  //int n = 2000;
    py::buffer_info buf_k = keypoints.request();
    py::buffer_info buf_d = descriptor.request();
    float *ptr_k = static_cast<float *>(buf_k.ptr);
    unsigned char *ptr_d = static_cast<unsigned char *>(buf_d.ptr);
-   cout << " #buf_k size" << buf_k.size;
-   cout << " #buf_d size" << buf_d.size;
-   for(int i=0; i < n; i++){
+   //cout << " #buf_k size" << buf_k.size;
+   //cout << " #buf_d size" << buf_d.size;
+   for(int i=0; i < 2000; i++){
         ptr_k[i*2] = k[i].pt.x;
 	ptr_k[i*2+1] = k[i].pt.y;
 	for (int j=0; j < 256; j++){
@@ -1170,6 +1170,49 @@ void orb_extractor_wrapper(py::array_t<uint8_t> img, int rows, int cols, py::arr
     // return descriptor;
 //	return keypoints; //extractor.GetLevels();
 }
+
+
+#include "ORBmatcher.h"
+#include "Frame.h"
+#include "ORBVocabulary.h"
+
+void orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &img2, int rows, int cols, py::array_t<float> &result) {
+    cv::Mat im1(rows, cols, CV_8UC3, img1.request().ptr); 
+    cv::Mat im2(rows, cols, CV_8UC3, img2.request().ptr); 
+    double timestamp_dummy = 1;
+    static ORB_SLAM2::ORBextractor extractor(2000, 1.2, 8, 20, 7);
+    // camera parameter uses ./Examples/Monocular/KITTI00-02.yaml
+    cv::Mat K = cv::Mat::eye(3,3,CV_32F);
+    K.at<float>(0,0) = 718.856;
+    K.at<float>(1,1) = 718.856;
+    K.at<float>(0,2) = 607.1928;
+    K.at<float>(1,2) = 185.2157;
+
+    cv::Mat DistCoef(4,1,CV_32F);
+    DistCoef.at<float>(0) = 0.0;
+    DistCoef.at<float>(1) = 0.0;
+    DistCoef.at<float>(2) = 0.0;
+    DistCoef.at<float>(3) = 0.0;
+
+    float bf = 0.0;
+    float thDepth = 0.0;
+    ORB_SLAM2::Frame frame1(im1, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
+    ORB_SLAM2::Frame frame2(im2, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
+    // extract keypoints in frame1 
+    std::vector<cv::Point2f> mvbPrevMatched;
+    mvbPrevMatched.resize(frame1.mvKeysUn.size());
+    for(size_t i=0; i<frame1.mvKeysUn.size(); i++)
+        mvbPrevMatched[i]=frame1.mvKeysUn[i].pt;
+
+    std::vector<int> mvIniMatches;
+    fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+
+    static ORB_SLAM2::ORBmatcher matcher(0.9,true);
+    int window = 100; 
+    int nmatch = matcher.SearchForInitialization(frame1, frame2, mvbPrevMatched, mvIniMatches, window);
+    cout << " # nmatch" << nmatch;
+}
+
 
 int test_size(py::array_t<double> img) {
     return img.size();
