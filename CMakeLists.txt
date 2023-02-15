@@ -44,9 +44,23 @@ ${PROJECT_SOURCE_DIR}/include
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 add_subdirectory(extern/pybind11)
-pybind11_add_module(${PROJECT_NAME} src/ORBextractor.cc)
+pybind11_add_module(${PROJECT_NAME} 
+src/ORBextractor.cc
+src/ORBmatcher.cc
+src/Frame.cc
+)
+
 
 target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
+${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 )
+
+# target_link_libraries(${PROJECT_NAME}
+# ${OpenCV_LIBS}
+# ${EIGEN3_LIBS}
+# ${Pangolin_LIBRARIES}
+# ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
+# ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
+# )
 
