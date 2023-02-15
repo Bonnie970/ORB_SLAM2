@@ -36,9 +36,12 @@ if(NOT OpenCV_FOUND)
    endif()
 endif()
 
+find_package(Eigen3 3.1.0 REQUIRED)
+
 include_directories(
 ${PROJECT_SOURCE_DIR}
 ${PROJECT_SOURCE_DIR}/include
+${EIGEN3_INCLUDE_DIR}
 )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
@@ -63,4 +66,28 @@ ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 # ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 # ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
 # )
+
+
+## Compile test file 
+set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+set(CMAKE_HAVE_THREADS_LIBRARY 1)
+set(CMAKE_USE_WIN32_THREADS_INIT 0)
+set(CMAKE_USE_PTHREADS_INIT 1)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+add_executable(opencv_vs_slam 
+src/opencv_slam_compare.cc
+src/ORBextractor.origin.cc
+# src/ORBmatcher.cc
+# src/Frame.cc
+# src/MapPoint.cc
+# src/Map.cc
+# src/KeyFrame.cc 
+)
+target_link_libraries(opencv_vs_slam 
+${OpenCV_LIBS}
+${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
+${EIGEN3_LIBS}
+)
 

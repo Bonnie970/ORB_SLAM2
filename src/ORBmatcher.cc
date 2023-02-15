@@ -405,7 +405,7 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
     return nmatches;
 }
 
-int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
+int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize, int threshold)
 {
     int nmatches=0;
     vnMatches12 = vector<int>(F1.mvKeysUn.size(),-1);
@@ -413,7 +413,9 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
     vector<int> rotHist[HISTO_LENGTH];
     for(int i=0;i<HISTO_LENGTH;i++)
         rotHist[i].reserve(500);
-    const float factor = 1.0f/HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;
+    const float factor = HISTO_LENGTH / 360.0f;
+
 
     vector<int> vMatchedDistance(F2.mvKeysUn.size(),INT_MAX);
     vector<int> vnMatches21(F2.mvKeysUn.size(),-1);
@@ -459,7 +461,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
             }
         }
 
-        if(bestDist<=TH_LOW)
+        if(bestDist<=threshold)
         {
             if(bestDist<(float)bestDist2*mfNNratio)
             {

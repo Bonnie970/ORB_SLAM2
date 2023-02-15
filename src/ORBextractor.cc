@@ -1146,27 +1146,46 @@ namespace py = pybind11;
 // int orb_extractor_wrapper(cv::Mat img, std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors) {
 //int orb_extractor_wrapper(unsigned char* imgData, int rows, int cols){//, py::array_t<double> keypoints, py::array_t<double> descriptor) {
 //py::array_t<int> 
-void orb_extractor_wrapper(py::array_t<uint8_t> &img, int rows, int cols, py::array_t<float> &keypoints, py::array_t<uint8_t> &descriptor) {
-    static ORB_SLAM2::ORBextractor extractor(2000, 1.2, 8, 20, 7);
+void orb_extractor_wrapper(py::array_t<uint8_t> &img, int rows, int cols, int n_kp, int iniThFAST, int minThFAST, py::array_t<float> &keypoints, py::array_t<uint8_t> &descriptor) {
+    static ORB_SLAM2::ORBextractor extractor(n_kp, 1.2, 8, iniThFAST, minThFAST);
     std::vector<cv::KeyPoint> k;
     //cv::OutputArray d;
     cv::Mat d;
     cv::Mat img_mat(rows, cols, CV_8UC3, img.request().ptr); 
     extractor(img_mat, cv::Mat(), k, d); 
-  //int n = 2000;
    py::buffer_info buf_k = keypoints.request();
    py::buffer_info buf_d = descriptor.request();
    float *ptr_k = static_cast<float *>(buf_k.ptr);
    unsigned char *ptr_d = static_cast<unsigned char *>(buf_d.ptr);
    //cout << " #buf_k size" << buf_k.size;
    //cout << " #buf_d size" << buf_d.size;
-   for(int i=0; i < 2000; i++){
+   for(int i=0; i < n_kp; i++){
         ptr_k[i*2] = k[i].pt.x;
-	ptr_k[i*2+1] = k[i].pt.y;
-	for (int j=0; j < 256; j++){
-	    ptr_d[i*256 + j] = d.at<uchar>(i,j);
-	}
+        ptr_k[i*2+1] = k[i].pt.y;
+        for (int j=0; j < 256; j++){
+            ptr_d[i*256 + j] = d.at<uchar>(i,j);
+        }
     } 
+
+
+    /// TEST OPENCV ORB 
+    int edgeTh = 31; 
+    int patchsize = 31; 
+    int fastTh = 20; 
+    Ptr<FeatureDetector> cv_orb_detector = cv::ORB::create(n_kp, 1.2, 8, edgeTh, 0, 2, cv::ORB::HARRIS_SCORE, patchsize, fastTh);
+    Ptr<DescriptorExtractor> cv_orb_descriptor = cv::ORB::create(n_kp, 1.2, 8, edgeTh, 0, 2, cv::ORB::HARRIS_SCORE, patchsize, fastTh);
+    cv_orb_detector->detect (img_mat,k);
+    cv_orb_descriptor->compute ( img_mat, k, d);
+    cout << "open cv orb descriptor size " << d.size(); 
+    for(int i=0; i < n_kp; i++){
+        ptr_k[i*2] = k[i].pt.x;
+        ptr_k[i*2+1] = k[i].pt.y;
+        for (int j=0; j < 256; j++){
+            ptr_d[i*256 + j] = d.at<uchar>(i,j);
+        }
+    } 
+   
+   
     // return descriptor;
 //	return keypoints; //extractor.GetLevels();
 }
@@ -1175,12 +1194,24 @@ void orb_extractor_wrapper(py::array_t<uint8_t> &img, int rows, int cols, py::ar
 #include "ORBmatcher.h"
 #include "Frame.h"
 #include "ORBVocabulary.h"
+#include <chrono>
 
-void orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &img2, int rows, int cols, py::array_t<float> &result) {
+int orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &img2, int rows, int cols, int n_kp, int iniThFAST, int minThFAST, int window, int matcher_threshold, py::array_t<float> &result, py::array_t<int> &matches) {
+    // typedef std::chrono::high_resolution_clock Clock;
+
+    // auto t1 = Clock::now();
     cv::Mat im1(rows, cols, CV_8UC3, img1.request().ptr); 
+    // auto t2 = Clock::now() - t1;
+    // cout << t2 << '\n';
+
+    // t1 = Clock::now();
     cv::Mat im2(rows, cols, CV_8UC3, img2.request().ptr); 
+    // t2 = Clock::now() - t1;
+    // cout << t2 << '\n';
+
     double timestamp_dummy = 1;
-    static ORB_SLAM2::ORBextractor extractor(2000, 1.2, 8, 20, 7);
+    static ORB_SLAM2::ORBextractor extractor(n_kp, 1.2, 8, iniThFAST, minThFAST);
+
     // camera parameter uses ./Examples/Monocular/KITTI00-02.yaml
     cv::Mat K = cv::Mat::eye(3,3,CV_32F);
     K.at<float>(0,0) = 718.856;
@@ -1196,21 +1227,49 @@ void orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> 
 
     float bf = 0.0;
     float thDepth = 0.0;
+    // auto t1 = Clock::now();
     ORB_SLAM2::Frame frame1(im1, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
     ORB_SLAM2::Frame frame2(im2, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
+    // auto t2 = Clock::now() - t1;
+    // cout << t2 << '\n';
+
     // extract keypoints in frame1 
     std::vector<cv::Point2f> mvbPrevMatched;
     mvbPrevMatched.resize(frame1.mvKeysUn.size());
     for(size_t i=0; i<frame1.mvKeysUn.size(); i++)
         mvbPrevMatched[i]=frame1.mvKeysUn[i].pt;
 
+    // cout << " # pt" << mvbPrevMatched.size() << mvbPrevMatched[5];
+
     std::vector<int> mvIniMatches;
     fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+    // cout << " # mvIniMatches.size()" << mvIniMatches.size() << "\n";
 
-    static ORB_SLAM2::ORBmatcher matcher(0.9,true);
-    int window = 100; 
-    int nmatch = matcher.SearchForInitialization(frame1, frame2, mvbPrevMatched, mvIniMatches, window);
-    cout << " # nmatch" << nmatch;
+    static ORB_SLAM2::ORBmatcher matcher(0.9, false);
+    int nmatch = matcher.SearchForInitialization(frame1, frame2, mvbPrevMatched, mvIniMatches, window, matcher_threshold);
+    // cout << " # nmatch" << nmatch;
+    // cout << " # mvIniMatches" << mvIniMatches[0]<< "\n"<< mvIniMatches[1]<< "\n"<< mvIniMatches[2]<< "\n"<< mvIniMatches[3] << "\n";
+
+    // save results 
+    py::buffer_info buf = result.request();
+    float *ptr = static_cast<float *>(buf.ptr);
+    py::buffer_info buf_m = matches.request();
+    int *ptr_m = static_cast<int *>(buf_m.ptr);
+    // cout << "mvIniMatches.size() " << mvIniMatches.size() << "\n"; 
+    // cout << "frame1.mvKeysUn.size() " << frame1.mvKeysUn.size() << "\n"; 
+    // cout << "frame2.mvKeysUn.size() " << frame2.mvKeysUn.size() << "\n"; 
+    for(size_t i=0; i<n_kp;i++) //mvIniMatches.size()
+    {
+        ptr_m[i] = mvIniMatches[i];
+        if(mvIniMatches[i]>=0)
+            cout << "(" << ptr_m[i] << ","<< mvIniMatches[i] << "), ";
+        ptr[i*4] = frame1.mvKeysUn[i].pt.x; 
+        ptr[i*4 + 1] = frame1.mvKeysUn[i].pt.y; 
+        ptr[i*4 + 2] = frame2.mvKeysUn[i].pt.x; //frame2.mvKeysUn[mvIniMatches[i]].pt.x; 
+        ptr[i*4 + 3] = frame2.mvKeysUn[i].pt.y; //frame2.mvKeysUn[mvIniMatches[i]].pt.y; 
+    }
+
+    return nmatch;
 }
 
 
@@ -1219,6 +1278,7 @@ int test_size(py::array_t<double> img) {
 }
 
 PYBIND11_MODULE(ORB_SLAM2, m) {
-    m.def("orb_extractor_wrapper", &orb_extractor_wrapper, "A test function");
+    m.def("orb_frame_matcher_wrapper", &orb_frame_matcher_wrapper, "orb matcher");
+    m.def("orb_extractor_wrapper", &orb_extractor_wrapper, "orb feature extractor");
     m.def("test_size", &test_size, "A test function");
 }

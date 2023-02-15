@@ -19,7 +19,7 @@
 */
 
 #include "Frame.h"
-#include "Converter.h"
+// #include "Converter.h"
 #include "ORBmatcher.h"
 #include <thread>
 
@@ -392,14 +392,14 @@ bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
 }
 
 
-void Frame::ComputeBoW()
-{
-    if(mBowVec.empty())
-    {
-        vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
-        mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
-    }
-}
+// void Frame::ComputeBoW()
+// {
+//     if(mBowVec.empty())
+//     {
+//         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
+//         mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
+//     }
+// }
 
 void Frame::UndistortKeyPoints()
 {
