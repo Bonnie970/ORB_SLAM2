@@ -1290,7 +1290,7 @@ int orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &
     // cout << "mvIniMatches.size() " << mvIniMatches.size() << "\n"; 
     // cout << "frame1.mvKeysUn.size() " << frame1.mvKeysUn.size() << "\n"; 
     // cout << "frame2.mvKeysUn.size() " << frame2.mvKeysUn.size() << "\n"; 
-    for(size_t i=0; i<n_kp;i++) //mvIniMatches.size()
+    for(int i=0; i<n_kp;i++) //mvIniMatches.size()
     {
         ptr_m[i] = mvIniMatches[i];
         // if(mvIniMatches[i]>=0)
@@ -1305,11 +1305,119 @@ int orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &
 }
 
 
+int orb_get_homography_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &img2, int rows, int cols, int n_kp, int iniThFAST, int minThFAST, int window, int matcher_threshold, py::array_t<double> &homography) {
+    // typedef std::chrono::high_resolution_clock Clock;
+
+    // auto t1 = Clock::now();
+    cv::Mat im1(rows, cols, CV_8UC3, img1.request().ptr); 
+    // auto t2 = Clock::now() - t1;
+    // cout << t2 << '\n';
+    cv::Mat im2(rows, cols, CV_8UC3, img2.request().ptr); 
+    cv::Mat mImGray1 = im1;
+    cv::Mat mImGray2 = im2;
+    cv::cvtColor(mImGray1,mImGray1, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(mImGray2,mImGray2, cv::COLOR_BGR2GRAY);
+
+    double timestamp_dummy = 1;
+    static ORB_SLAM2::ORBextractor extractor(n_kp, 1.2, 8, iniThFAST, minThFAST);
+
+    // camera parameter uses ./Examples/Monocular/KITTI00-02.yaml
+    cv::Mat K = cv::Mat::eye(3,3,CV_32F);
+    K.at<float>(0,0) = 718.856;
+    K.at<float>(1,1) = 718.856;
+    K.at<float>(0,2) = 607.1928;
+    K.at<float>(1,2) = 185.2157;
+
+    cv::Mat DistCoef(4,1,CV_32F);
+    DistCoef.at<float>(0) = 0.0;
+    DistCoef.at<float>(1) = 0.0;
+    DistCoef.at<float>(2) = 0.0;
+    DistCoef.at<float>(3) = 0.0;
+
+    float bf = 0.0;
+    float thDepth = 0.0;
+
+    ORB_SLAM2::Frame frame1(mImGray1, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
+    ORB_SLAM2::Frame frame2(mImGray2, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
+
+    // extract keypoints in frame1 
+    std::vector<cv::Point2f> mvbPrevMatched;
+    mvbPrevMatched.resize(frame1.mvKeysUn.size());
+    for(size_t i=0; i<frame1.mvKeysUn.size(); i++)
+        mvbPrevMatched[i]=frame1.mvKeysUn[i].pt;
+
+
+    std::vector<int> IniMatches;
+    fill(IniMatches.begin(),IniMatches.end(),-1);
+
+    static ORB_SLAM2::ORBmatcher matcher(0.9, false);
+    int nmatch = matcher.SearchForInitialization(frame1, frame2, mvbPrevMatched, IniMatches, window, matcher_threshold);
+
+    // // Save keypoints results 
+    // py::buffer_info buf = result.request();
+    // float *ptr = static_cast<float *>(buf.ptr);
+    // py::buffer_info buf_m = matches.request();
+    // int *ptr_m = static_cast<int *>(buf_m.ptr);
+    
+    // for(size_t i=0; i<n_kp;i++) 
+    // {
+    //     ptr_m[i] = IniMatches[i];
+    //     ptr[i*4] = frame1.mvKeysUn[i].pt.x; 
+    //     ptr[i*4 + 1] = frame1.mvKeysUn[i].pt.y; 
+    //     ptr[i*4 + 2] = frame2.mvKeysUn[i].pt.x; //frame2.mvKeysUn[IniMatches[i]].pt.x; 
+    //     ptr[i*4 + 3] = frame2.mvKeysUn[i].pt.y; //frame2.mvKeysUn[IniMatches[i]].pt.y; 
+    // }
+
+    std::vector<cv::DMatch> good_matches; 
+    for (size_t i=0; i < IniMatches.size(); i++){
+        if (IniMatches[i] == -1){
+            continue; 
+        }
+        // DMatch (int _queryIdx, int _trainIdx, int _imgIdx, float _distance)
+        good_matches.push_back(cv::DMatch(i, IniMatches[i], 0, 1) );
+    }
+    // // Visulization 
+    // cv::Mat slam_ORBmatch;
+    // cv::drawMatches(img_1, frame1.mvKeysUn, img_2, frame2.mvKeysUn, good_matches, slam_ORBmatch, cv::Scalar::all(-1), cv::Scalar(0,255,0));
+    // cv::imwrite("/guanqing_ORB_SLAM2/slam_ORBmatch.png", slam_ORBmatch);
+
+    // Fine homography
+    std::vector<cv::Point2f> points1_slam;
+    std::vector<cv::Point2f> points2_slam;
+    for( size_t i = 0; i < good_matches.size(); i++ )
+    {
+        points1_slam.push_back( frame1.mvKeysUn[ good_matches[i].queryIdx ].pt );
+        points2_slam.push_back( frame2.mvKeysUn[ good_matches[i].trainIdx ].pt );
+    }
+    cv::Mat H = cv::findHomography( points1_slam , points2_slam, cv::RANSAC); 
+    // // Visulization 
+    cv::Mat slam_warp_img_1; 
+	cv::warpPerspective(im1, slam_warp_img_1, H, im1.size());
+    // slam_warp_img_1 = slam_warp_img_1*0.5 + im2*0.5;
+    // cv::imwrite("/guanqing_ORB_SLAM2/overlay.png", slam_warp_img_1);  
+
+    // copy H to numpy 
+    // py::buffer_info buf_h = homography.request();
+    // double *ptr_h = static_cast<double *>(buf_h.ptr);
+    // cout << "H = " << endl << " "  << H << endl << endl << H.at<double>(0,0);
+    // for (int i=0; i < 3; i++){
+    //     for (int j=0; i < 3; j++){
+    //         // ptr_h[i] = 0; //H.at<double>(i,j);
+    //         cout << i << " " << j << endl; 
+    //     }
+    // }
+
+    return nmatch;
+}
+
+
+
 int test_size(py::array_t<double> img) {
     return img.size();
 }
 
 PYBIND11_MODULE(ORB_SLAM2, m) {
+    m.def("orb_get_homography_wrapper", &orb_get_homography_wrapper, "orb matcher and homography");
     m.def("orb_frame_matcher_wrapper", &orb_frame_matcher_wrapper, "orb matcher");
     m.def("orb_extractor_wrapper", &orb_extractor_wrapper, "orb feature extractor");
     m.def("test_size", &test_size, "A test function");
