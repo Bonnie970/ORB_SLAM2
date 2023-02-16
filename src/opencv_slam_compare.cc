@@ -88,9 +88,9 @@ int main ( int argc, char** argv )
     int window = 100; 
     int matcher_threshold = 50; 
     int nmatch = SLAMmatcher.SearchForInitialization(frame1, frame2, PrevMatched, IniMatches, window, matcher_threshold);
-    cout << "nmatch " << nmatch << "\n";
+    cout << "Running opencv_slam_compare.cc --> nmatch " << nmatch << "\n";
     std::vector<cv::DMatch> Dmatches; 
-    for (int i=0; i < IniMatches.size(); i++){
+    for (size_t i=0; i < IniMatches.size(); i++){
         if (IniMatches[i] == -1){
             continue; 
         }

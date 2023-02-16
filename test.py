@@ -77,7 +77,7 @@ matcher_threshold = 50 # 150 # default 50
 cols, rows = default_size
 kps = np.zeros((n_kp, 2, 2), dtype=np.float32)
 matches = np.ones((n_kp, 1), dtype=np.intc) * -1
-homography = np.ones((5,5), dtype=np.float64)
+homography = np.ones((3,3), dtype=np.double)
 
 '''
 t1 = time.perf_counter()
@@ -111,12 +111,13 @@ cv2.imwrite('/root/guanqing_ORB_SLAM2/pybind_slam_ORBmatch_warp_overlay.png', im
 ''' 
 
 t1 = time.perf_counter()
-n = 1000
+n = 1
 for _ in range(n):
     nmatch = orb_get_homography_wrapper(imgs[0], imgs[1], rows, cols, n_kp, iniThFAST, minThFAST, window_size, matcher_threshold, homography)
 t2 = time.perf_counter()
 print(t2 - t1, 'average call time ', (t2 - t1) / n, 'fps = ', n / (t2 - t1))
-print('##### nmatches=', nmatch)
+print('nmatches=', nmatch)
+print('homography = \n', homography)
 
 print('passed test')
 

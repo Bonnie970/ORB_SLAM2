@@ -1397,15 +1397,14 @@ int orb_get_homography_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> 
     // cv::imwrite("/guanqing_ORB_SLAM2/overlay.png", slam_warp_img_1);  
 
     // copy H to numpy 
-    // py::buffer_info buf_h = homography.request();
-    // double *ptr_h = static_cast<double *>(buf_h.ptr);
-    // cout << "H = " << endl << " "  << H << endl << endl << H.at<double>(0,0);
-    // for (int i=0; i < 3; i++){
-    //     for (int j=0; i < 3; j++){
-    //         // ptr_h[i] = 0; //H.at<double>(i,j);
-    //         cout << i << " " << j << endl; 
-    //     }
-    // }
+    py::buffer_info buf_h = homography.request();
+    double *ptr_h = static_cast<double *>(buf_h.ptr);
+    // cout << "H = " << endl << " "  << H << endl << endl << H.type() << endl;
+    for (int i=0; i < 3; i++){
+        for (int j=0; j < 3; j++){
+            ptr_h[i*3 + j] = H.at<double>(i,j);
+        }
+    }
 
     return nmatch;
 }
