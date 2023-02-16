@@ -59,6 +59,7 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <vector>
+#include <iostream>
 
 #include "ORBextractor.h"
 
@@ -786,6 +787,8 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoin
         const int wCell = ceil(width/nCols);
         const int hCell = ceil(height/nRows);
 
+        // cout << level << " level " << nCols << ", " << nRows << ", " << wCell << ", " << hCell << "\n";
+
         for(int i=0; i<nRows; i++)
         {
             const float iniY =minBorderY+i*hCell;
@@ -814,6 +817,17 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoin
                     FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
                          vKeysCell,minThFAST,true);
                 }
+
+                // if (level==7 && j==0 && i==0){
+                //     cout << "FAST grid compute " << mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX).size() << "\n";
+                //     cout << "number of key points " << vKeysCell.size() << "\n"; 
+                //     for (size_t k=0; k < vKeysCell.size(); k++){
+                //         cout  << vKeysCell[k].pt.x <<"," <<vKeysCell[k].pt.y << "\n"; 
+                //     } 
+                //     cv:Mat r; 
+                //     cv::drawKeypoints( mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX), vKeysCell, r, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT );
+                //     cv::imwrite("/guanqing_ORB_SLAM2/slam_debug/rgb_level" + std::to_string(level) + ".png", r); 
+                // }
 
                 if(!vKeysCell.empty())
                 {
@@ -1150,40 +1164,58 @@ void orb_extractor_wrapper(py::array_t<uint8_t> &img, int rows, int cols, int n_
     static ORB_SLAM2::ORBextractor extractor(n_kp, 1.2, 8, iniThFAST, minThFAST);
     std::vector<cv::KeyPoint> k;
     //cv::OutputArray d;
-    cv::Mat d;
+    cv::Mat d, outimg1;
     cv::Mat img_mat(rows, cols, CV_8UC3, img.request().ptr); 
-    extractor(img_mat, cv::Mat(), k, d); 
-   py::buffer_info buf_k = keypoints.request();
-   py::buffer_info buf_d = descriptor.request();
-   float *ptr_k = static_cast<float *>(buf_k.ptr);
-   unsigned char *ptr_d = static_cast<unsigned char *>(buf_d.ptr);
-   //cout << " #buf_k size" << buf_k.size;
-   //cout << " #buf_d size" << buf_d.size;
-   for(int i=0; i < n_kp; i++){
-        ptr_k[i*2] = k[i].pt.x;
-        ptr_k[i*2+1] = k[i].pt.y;
-        for (int j=0; j < 256; j++){
-            ptr_d[i*256 + j] = d.at<uchar>(i,j);
-        }
-    } 
+    cv::Mat mImGray1 = img_mat;
+    cv::cvtColor(mImGray1,mImGray1, cv::COLOR_BGR2GRAY);//转换为灰度图
+
+    // // Check inputs B.G.R channels separately 
+    // cv::Mat ch1, ch2, ch3;
+    // // "channels" is a vector of 3 Mat arrays:
+    // std::vector<cv::Mat> channels(3);
+    // // split img:
+    // cv::split(img_mat, channels);
+    // // get the channels (dont forget they follow BGR order in OpenCV)
+    // ch1 = channels[0];
+    // ch2 = channels[1];
+    // ch3 = channels[2];  
+
+    extractor(mImGray1, cv::Mat(), k, d); 
+    // cv::imwrite("/guanqing_ORB_SLAM2/img_mat_check.png", img_mat); 
+    cv::drawKeypoints( img_mat, k, outimg1, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT );
+    cv::imwrite("/guanqing_ORB_SLAM2/pybind11_slam_keypoints.png",outimg1);
+   
+    py::buffer_info buf_k = keypoints.request();
+    py::buffer_info buf_d = descriptor.request();
+    float *ptr_k = static_cast<float *>(buf_k.ptr);
+    unsigned char *ptr_d = static_cast<unsigned char *>(buf_d.ptr);
+    //cout << " #buf_k size" << buf_k.size;
+    //cout << " #buf_d size" << buf_d.size;
+    for(int i=0; i < n_kp; i++){
+            ptr_k[i*2] = k[i].pt.x;
+            ptr_k[i*2+1] = k[i].pt.y;
+            for (int j=0; j < 256; j++){
+                ptr_d[i*256 + j] = d.at<uchar>(i,j);
+            }
+        } 
 
 
     /// TEST OPENCV ORB 
-    int edgeTh = 31; 
-    int patchsize = 31; 
-    int fastTh = 20; 
-    Ptr<FeatureDetector> cv_orb_detector = cv::ORB::create(n_kp, 1.2, 8, edgeTh, 0, 2, cv::ORB::HARRIS_SCORE, patchsize, fastTh);
-    Ptr<DescriptorExtractor> cv_orb_descriptor = cv::ORB::create(n_kp, 1.2, 8, edgeTh, 0, 2, cv::ORB::HARRIS_SCORE, patchsize, fastTh);
-    cv_orb_detector->detect (img_mat,k);
-    cv_orb_descriptor->compute ( img_mat, k, d);
-    cout << "open cv orb descriptor size " << d.size(); 
-    for(int i=0; i < n_kp; i++){
-        ptr_k[i*2] = k[i].pt.x;
-        ptr_k[i*2+1] = k[i].pt.y;
-        for (int j=0; j < 256; j++){
-            ptr_d[i*256 + j] = d.at<uchar>(i,j);
-        }
-    } 
+    // int edgeTh = 31; 
+    // int patchsize = 31; 
+    // int fastTh = 20; 
+    // Ptr<FeatureDetector> cv_orb_detector = cv::ORB::create(n_kp, 1.2, 8, edgeTh, 0, 2, cv::ORB::HARRIS_SCORE, patchsize, fastTh);
+    // Ptr<DescriptorExtractor> cv_orb_descriptor = cv::ORB::create(n_kp, 1.2, 8, edgeTh, 0, 2, cv::ORB::HARRIS_SCORE, patchsize, fastTh);
+    // cv_orb_detector->detect (img_mat,k);
+    // cv_orb_descriptor->compute ( img_mat, k, d);
+    // cout << "open cv orb descriptor size " << d.size(); 
+    // for(int i=0; i < n_kp; i++){
+    //     ptr_k[i*2] = k[i].pt.x;
+    //     ptr_k[i*2+1] = k[i].pt.y;
+    //     for (int j=0; j < 256; j++){
+    //         ptr_d[i*256 + j] = d.at<uchar>(i,j);
+    //     }
+    // } 
    
    
     // return descriptor;
@@ -1203,11 +1235,11 @@ int orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &
     cv::Mat im1(rows, cols, CV_8UC3, img1.request().ptr); 
     // auto t2 = Clock::now() - t1;
     // cout << t2 << '\n';
-
-    // t1 = Clock::now();
     cv::Mat im2(rows, cols, CV_8UC3, img2.request().ptr); 
-    // t2 = Clock::now() - t1;
-    // cout << t2 << '\n';
+    cv::Mat mImGray1 = im1;
+    cv::Mat mImGray2 = im2;
+    cv::cvtColor(mImGray1,mImGray1, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(mImGray2,mImGray2, cv::COLOR_BGR2GRAY);
 
     double timestamp_dummy = 1;
     static ORB_SLAM2::ORBextractor extractor(n_kp, 1.2, 8, iniThFAST, minThFAST);
@@ -1228,8 +1260,8 @@ int orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &
     float bf = 0.0;
     float thDepth = 0.0;
     // auto t1 = Clock::now();
-    ORB_SLAM2::Frame frame1(im1, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
-    ORB_SLAM2::Frame frame2(im2, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
+    ORB_SLAM2::Frame frame1(mImGray1, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
+    ORB_SLAM2::Frame frame2(mImGray2, timestamp_dummy, &extractor, static_cast<ORB_SLAM2::ORBVocabulary*>(NULL), K, DistCoef, bf, thDepth);
     // auto t2 = Clock::now() - t1;
     // cout << t2 << '\n';
 
@@ -1261,8 +1293,8 @@ int orb_frame_matcher_wrapper(py::array_t<uint8_t> &img1, py::array_t<uint8_t> &
     for(size_t i=0; i<n_kp;i++) //mvIniMatches.size()
     {
         ptr_m[i] = mvIniMatches[i];
-        if(mvIniMatches[i]>=0)
-            cout << "(" << ptr_m[i] << ","<< mvIniMatches[i] << "), ";
+        // if(mvIniMatches[i]>=0)
+        //     cout << "(" << ptr_m[i] << ","<< mvIniMatches[i] << "), ";
         ptr[i*4] = frame1.mvKeysUn[i].pt.x; 
         ptr[i*4 + 1] = frame1.mvKeysUn[i].pt.y; 
         ptr[i*4 + 2] = frame2.mvKeysUn[i].pt.x; //frame2.mvKeysUn[mvIniMatches[i]].pt.x; 

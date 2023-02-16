@@ -79,8 +79,8 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 add_executable(opencv_vs_slam 
 src/opencv_slam_compare.cc
 src/ORBextractor.origin.cc
-# src/ORBmatcher.cc
-# src/Frame.cc
+src/ORBmatcher.cc
+src/Frame.cc
 # src/MapPoint.cc
 # src/Map.cc
 # src/KeyFrame.cc 
